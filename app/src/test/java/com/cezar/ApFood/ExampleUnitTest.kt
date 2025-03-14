@@ -1,4 +1,4 @@
-package com.jailton.androidapptemplate
+package com.cezar.ApFood
 
 import org.junit.Test
 

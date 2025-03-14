@@ -1,4 +1,4 @@
-package com.jailton.androidapptemplate.ui.login
+package com.cezar.ApFood.ui.login
 
 import android.content.ContentValues.TAG
 import android.content.Intent
@@ -12,9 +12,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import com.jailton.androidapptemplate.MainActivity
-import com.jailton.androidapptemplate.R
-import com.jailton.androidapptemplate.ui.usuario.CadastroUsuarioActivity
+import com.cezar.ApFood.MainActivity
+import com.cezar.ApFood.R
+import com.cezar.ApFood.ui.usuario.CadastroUsuarioActivity
 
 class LoginActivity : AppCompatActivity() {
 
