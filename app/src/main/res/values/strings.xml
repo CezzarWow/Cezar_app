@@ -5,4 +5,6 @@
     <string name="title_profile">Profile</string>
 
     <string name="title_itens">Itens</string>
+
+    <string name="default_web_client_id">201363335456-tdd05rrk4cuo8hmae4o9kqu47lti6gom.apps.googleusercontent.com</string>
 </resources>
