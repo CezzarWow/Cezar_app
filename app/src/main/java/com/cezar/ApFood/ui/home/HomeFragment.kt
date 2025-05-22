@@ -10,7 +10,6 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.cezar.ApFood.databinding.FragmentHomeBinding
-
 import android.util.Base64
 import android.widget.*
 import android.graphics.BitmapFactory
@@ -21,6 +20,8 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.cezar.ApFood.R
+import com.cezar.ApFood.baseclasses.Item
 
 
 class HomeFragment : Fragment() {
