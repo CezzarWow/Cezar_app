@@ -145,8 +145,10 @@ class LoginActivity : AppCompatActivity() {
                 val account = task.getResult(ApiException::class.java)!!
                 firebaseAuthWithGoogle(account)
             } catch (e: ApiException) {
-                // Tratar falha de login
+                Log.w(TAG, "Google sign in failed, code = ${e.statusCode}", e)
+                Toast.makeText(this, "Falha no login Google: código ${e.statusCode}", Toast.LENGTH_LONG).show()
             }
+
         }
     }
 }
