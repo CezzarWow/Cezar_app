@@ -3,6 +3,7 @@ package com.cezar.ApFood.ui.home
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,6 +16,7 @@ import android.widget.*
 import android.graphics.BitmapFactory
 import android.location.Geocoder
 import android.location.Location
+import android.net.Uri
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.appcompat.app.AppCompatDelegate
@@ -39,6 +41,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import androidx.fragment.app.commit
+
+
 
 class HomeFragment : Fragment() {
 
@@ -47,6 +52,8 @@ class HomeFragment : Fragment() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var locationRequest: LocationRequest
+    private var currentLocation: Location? = null
+
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
@@ -85,6 +92,17 @@ class HomeFragment : Fragment() {
 
         val switch = view.findViewById<SwitchCompat>(R.id.darkModeSwitch)
         habilitaDarkMode(switch)
+
+        val mapsButton = view.findViewById<Button>(R.id.openInMapsButton)
+        mapsButton.setOnClickListener {
+            currentLocation?.let { location ->
+                val uri = "geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}(Minha+Localização)"
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+                intent.setPackage("com.google.android.apps.maps")
+                startActivity(intent)
+            } ?: Toast.makeText(requireContext(), "Localização não disponível", Toast.LENGTH_SHORT).show()
+        }
+
 
         return view
     }
@@ -183,6 +201,7 @@ class HomeFragment : Fragment() {
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
                     displayAddress(location)
+                    currentLocation = location
                 }
             }
         }
