@@ -1,48 +1,60 @@
 package com.cezar.ApFood.ui.home
 
-import android.graphics.BitmapFactory
 import android.Manifest
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Geocoder
-import android.location.Location
+import android.content.Context
 import android.os.Bundle
-import android.os.Looper
-import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.fragment.app.Fragment
+import android.util.Base64
 import android.widget.*
+import android.graphics.BitmapFactory
+import android.location.Geocoder
+import android.location.Location
+import android.os.Looper
+import androidx.core.app.ActivityCompat
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
-import androidx.core.app.ActivityCompat
-import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.material.snackbar.Snackbar
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.cezar.ApFood.R
 import com.cezar.ApFood.baseclasses.Item
 import com.cezar.ApFood.databinding.FragmentHomeBinding
-import com.google.android.gms.location.*
-import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.database.*
-import kotlinx.coroutines.*
-import java.util.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
-    private val binding get() = _binding!!
-
     private lateinit var currentAddressTextView: TextView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var locationRequest: LocationRequest
 
-    private var ultimaLocalizacao: Location? = null
-
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
     }
+
+    // This property is only valid between onCreateView and
+    // onDestroyView.
+    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,8 +62,8 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         val view = inflater.inflate(R.layout.fragment_home, container, false)
-
         currentAddressTextView = view.findViewById(R.id.currentAddressTextView)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         if (ActivityCompat.checkSelfPermission(
@@ -67,26 +79,12 @@ class HomeFragment : Fragment() {
             getCurrentLocation()
         }
 
-        val containerLayout = view.findViewById<LinearLayout>(R.id.itemContainer)
-        carregarItensMarketplace(containerLayout)
+
+        val container = view.findViewById<LinearLayout>(R.id.itemContainer)
+        carregarItensMarketplace(container)
 
         val switch = view.findViewById<SwitchCompat>(R.id.darkModeSwitch)
         habilitaDarkMode(switch)
-
-        val mapsButton = view.findViewById<Button>(R.id.openInMapsButton)
-        mapsButton.setOnClickListener {
-            ultimaLocalizacao?.let { location ->
-                val uri =
-                    "geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}(Minha+Localização)"
-                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri))
-                intent.setPackage("com.google.android.apps.maps")
-                startActivity(intent)
-            } ?: Toast.makeText(
-                requireContext(),
-                "Localização não disponível",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
 
         return view
     }
@@ -95,6 +93,50 @@ class HomeFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
+
+    fun carregarItensMarketplace(container: LinearLayout) {
+        val databaseRef = FirebaseDatabase.getInstance().getReference("itens")
+
+        databaseRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                container.removeAllViews()
+
+                for (userSnapshot in snapshot.children) {
+                    for (itemSnapshot in userSnapshot.children) {
+                        val item = itemSnapshot.getValue(Item::class.java) ?: continue
+
+                        val itemView = LayoutInflater.from(container.context)
+                            .inflate(R.layout.item_template, container, false)
+
+                        val imageView = itemView.findViewById<ImageView>(R.id.item_image)
+                        val enderecoView = itemView.findViewById<TextView>(R.id.item_endereco)
+
+                        enderecoView.text = "Endereço: ${item.endereco ?: "Não informado"}"
+
+                        if (!item.imageUrl.isNullOrEmpty()) {
+                            Glide.with(container.context).load(item.imageUrl).into(imageView)
+                        } else if (!item.base64Image.isNullOrEmpty()) {
+                            try {
+                                val bytes = Base64.decode(item.base64Image, Base64.DEFAULT)
+                                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                imageView.setImageBitmap(bitmap)
+                            } catch (_: Exception) {
+                            }
+                        }
+
+                        container.addView(itemView)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(container.context, "Erro ao carregar dados", Toast.LENGTH_SHORT)
+                    .show()
+            }
+        })
+    }
+
 
     private fun requestLocationPermission() {
         requestPermissions(
@@ -118,7 +160,7 @@ class HomeFragment : Fragment() {
             } else {
                 Snackbar.make(
                     requireView(),
-                    "Permissão de localização negada.",
+                    "Permission denied. Cannot access location.",
                     Snackbar.LENGTH_LONG
                 ).show()
             }
@@ -140,16 +182,16 @@ class HomeFragment : Fragment() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
-                    ultimaLocalizacao = location
                     displayAddress(location)
                 }
             }
         }
 
         locationRequest = LocationRequest.create().apply {
-            interval = 30000
-            fastestInterval = 30000
-            priority = Priority.PRIORITY_HIGH_ACCURACY
+            interval = 30000 // Intervalo em milissegundos para atualizacoes de localizacao
+            fastestInterval =
+                30000 // O menor intervalo de tempo para receber atualizacoes de localizacao
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         }
 
         fusedLocationClient.requestLocationUpdates(
@@ -165,72 +207,30 @@ class HomeFragment : Fragment() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val address = addresses?.firstOrNull()?.getAddressLine(0) ?: "Endereço não encontrado"
+                val address = addresses?.firstOrNull()?.getAddressLine(0) ?: "Address not found"
                 withContext(Dispatchers.Main) {
                     currentAddressTextView.text = address
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    currentAddressTextView.text = "Erro: ${e.message}"
+                    currentAddressTextView.text = "Error: ${e.message}"
                 }
             }
         }
     }
 
-    private fun carregarItensMarketplace(container: LinearLayout) {
-        val databaseRef = FirebaseDatabase.getInstance().getReference("itens")
+    fun habilitaDarkMode(switch: SwitchCompat){
 
-        databaseRef.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                container.removeAllViews()
-                for (userSnapshot in snapshot.children) {
-                    for (itemSnapshot in userSnapshot.children) {
-                        val item = itemSnapshot.getValue(Item::class.java) ?: continue
-
-                        val itemView = LayoutInflater.from(container.context)
-                            .inflate(R.layout.item_template, container, false)
-
-                        val imageView = itemView.findViewById<ImageView>(R.id.item_image)
-                        val enderecoView = itemView.findViewById<TextView>(R.id.item_endereco)
-
-                        enderecoView.text = "Endereço: ${item.endereco ?: "Não informado"}"
-
-                        if (!item.imageUrl.isNullOrEmpty()) {
-                            Glide.with(container.context).load(item.imageUrl).into(imageView)
-                        } else if (!item.base64Image.isNullOrEmpty()) {
-                            try {
-                                val bytes = Base64.decode(item.base64Image, Base64.DEFAULT)
-                                val bitmap =
-                                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                imageView.setImageBitmap(bitmap)
-                            } catch (_: Exception) {
-                            }
-                        }
-
-                        container.addView(itemView)
-                    }
-                }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(
-                    container.context,
-                    "Erro ao carregar dados",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        })
-    }
-
-    private fun habilitaDarkMode(switch: SwitchCompat) {
         val prefs = requireActivity().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
 
+        // Estado salvo
         val darkMode = prefs.getBoolean("dark_mode", false)
         switch.isChecked = darkMode
         AppCompatDelegate.setDefaultNightMode(
             if (darkMode) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
         )
 
+        // Listener de mudança
         switch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("dark_mode", isChecked).apply()
             AppCompatDelegate.setDefaultNightMode(
